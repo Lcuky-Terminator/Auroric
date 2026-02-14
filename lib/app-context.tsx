@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { getSession } from 'next-auth/react';
+import { useRouter, usePathname } from 'next/navigation';
 import { User, Pin, Board, Notification } from './types';
 import { api } from './api-client';
 import { registerUser } from './email-verification';
@@ -491,7 +492,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={value}>
+      <EmailVerificationGuard>
+        {children}
+      </EmailVerificationGuard>
+    </AppContext.Provider>
+  );
+}
+
+/**
+ * Global guard that forces unverified logged-in users to /verify-email.
+ * They cannot access any other page until they verify.
+ */
+function EmailVerificationGuard({ children }: { children: ReactNode }) {
+  const { currentUser, isLoggedIn } = useApp();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Pages that unverified users ARE allowed to visit
+  const allowedPaths = ['/verify-email', '/verify'];
+  const isAllowedPath = allowedPaths.includes(pathname);
+
+  useEffect(() => {
+    if (isLoggedIn && currentUser && !currentUser.emailVerified && !isAllowedPath) {
+      router.replace('/verify-email');
+    }
+  }, [isLoggedIn, currentUser, isAllowedPath, router]);
+
+  // If logged in, unverified, and trying to access a restricted page, show loading
+  if (isLoggedIn && currentUser && !currentUser.emailVerified && !isAllowedPath) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-foreground/60">Redirecting to email verification...</p>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
 }
 
 const noop = () => {};

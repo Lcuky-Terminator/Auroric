@@ -3,8 +3,7 @@
 import React, { useState } from 'react';
 import { useApp } from '@/lib/app-context';
 import { resendVerification } from '@/lib/email-verification';
-import { Mail, ArrowLeft, RefreshCw } from 'lucide-react';
-import Link from 'next/link';
+import { Mail, RefreshCw } from 'lucide-react';
 
 /**
  * /verify-email — "Check your inbox" page.
@@ -77,18 +76,15 @@ export default function VerifyEmailPage() {
           <p className="text-foreground/40">
             Didn&apos;t receive it? Check your spam folder or try a different email.
           </p>
-          <div className="flex items-center justify-center gap-4 mt-2">
-            <Link
-              href="/"
-              className="text-foreground/60 hover:text-foreground flex items-center gap-1 smooth-transition"
-            >
-              <ArrowLeft className="w-4 h-4" /> Back to home
-            </Link>
+          <p className="text-foreground/40 mt-1">
+            You must verify your email before you can use Auroric.
+          </p>
+          <div className="flex items-center justify-center gap-4 mt-3">
             <button
               onClick={() => logout()}
               className="text-destructive/80 hover:text-destructive smooth-transition"
             >
-              Sign out
+              Sign out &amp; use a different email
             </button>
           </div>
         </div>
