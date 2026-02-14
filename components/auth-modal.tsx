@@ -1,9 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '@/lib/app-context';
+import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
-import { X } from 'lucide-react';
+import { X, Check, AlertCircle, Loader2 } from 'lucide-react';
+
+/** Only lowercase letters, numbers, and underscores. 3-20 chars. */
+const USERNAME_REGEX = /^[a-z0-9_]{3,20}$/;
+
+function sanitizeUsername(raw: string) {
+  return raw.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20);
+}
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -13,6 +21,7 @@ interface AuthModalProps {
 
 export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalProps) {
   const { login, signup, loginWithGoogle } = useApp();
+  const router = useRouter();
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -22,16 +31,74 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
     displayName: '',
     email: '',
     password: '',
+    confirmPassword: '',
   });
 
+  // ── Username inline validation state ──
+  const [usernameHint, setUsernameHint] = useState<{
+    type: 'idle' | 'error' | 'checking' | 'taken' | 'available';
+    message: string;
+  }>({ type: 'idle', message: '' });
+  const usernameTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Sync mode when initialMode prop changes (e.g. user clicks Log In vs Sign Up)
-  React.useEffect(() => {
+  useEffect(() => {
     setMode(initialMode);
     setError('');
-    setFormData({ username: '', displayName: '', email: '', password: '' });
+    setUsernameHint({ type: 'idle', message: '' });
+    setFormData({ username: '', displayName: '', email: '', password: '', confirmPassword: '' });
   }, [initialMode, isOpen]);
 
+  // ── Debounced username availability check ──
+  useEffect(() => {
+    if (mode !== 'signup') return;
+    const val = formData.username;
+
+    // Clear any pending check
+    if (usernameTimerRef.current) clearTimeout(usernameTimerRef.current);
+
+    // Empty
+    if (!val) {
+      setUsernameHint({ type: 'idle', message: '' });
+      return;
+    }
+
+    // Format check first
+    if (val.length < 3) {
+      setUsernameHint({ type: 'error', message: 'Must be at least 3 characters' });
+      return;
+    }
+    if (!USERNAME_REGEX.test(val)) {
+      setUsernameHint({ type: 'error', message: 'Only lowercase letters, numbers & underscores' });
+      return;
+    }
+
+    // Debounce the availability check (400ms)
+    setUsernameHint({ type: 'checking', message: 'Checking availability…' });
+    usernameTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/users/by-username/${encodeURIComponent(val)}`);
+        if (res.ok) {
+          setUsernameHint({ type: 'taken', message: 'Username is already taken' });
+        } else {
+          setUsernameHint({ type: 'available', message: 'Username is available' });
+        }
+      } catch {
+        setUsernameHint({ type: 'available', message: 'Username is available' });
+      }
+    }, 400);
+
+    return () => {
+      if (usernameTimerRef.current) clearTimeout(usernameTimerRef.current);
+    };
+  }, [formData.username, mode]);
+
   if (!isOpen) return null;
+
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = sanitizeUsername(e.target.value);
+    setFormData({ ...formData, username: sanitized });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +110,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
         const success = await login(formData.username, formData.password);
         if (success) {
           onClose();
-          setFormData({ username: '', displayName: '', email: '', password: '' });
+          setFormData({ username: '', displayName: '', email: '', password: '', confirmPassword: '' });
         } else {
           setError('Invalid credentials. Try "alexdesigner" with password "password123".');
         }
@@ -53,10 +120,34 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
           setLoading(false);
           return;
         }
+        if (formData.password !== formData.confirmPassword) {
+          setError('Passwords do not match');
+          setLoading(false);
+          return;
+        }
+        if (formData.password.length < 8) {
+          setError('Password must be at least 8 characters');
+          setLoading(false);
+          return;
+        }
+        // Block submit if username is invalid or taken
+        if (!USERNAME_REGEX.test(formData.username)) {
+          setError('Username must be 3-20 lowercase letters, numbers, or underscores');
+          setLoading(false);
+          return;
+        }
+        if (usernameHint.type === 'taken') {
+          setError('That username is already taken — please choose another');
+          setLoading(false);
+          return;
+        }
+
         const success = await signup(formData.username, formData.displayName, formData.email, formData.password);
         if (success) {
           onClose();
-          setFormData({ username: '', displayName: '', email: '', password: '' });
+          setFormData({ username: '', displayName: '', email: '', password: '', confirmPassword: '' });
+          // Redirect to verify-email page after signup
+          router.push('/verify-email');
         } else {
           setError('Username or email already exists');
         }
@@ -100,7 +191,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
             setError('');
             try {
               // Trigger Google OAuth — redirects to Google login page
-              await signIn('google', { callbackUrl: window.location.origin });
+              // Add google=1 param so the app can detect the redirect and bridge the session
+              await signIn('google', { callbackUrl: `${window.location.origin}/?google=1` });
             } catch {
               setError('Google sign-in failed. Please try again.');
               setGoogleLoading(false);
@@ -144,13 +236,44 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
             <label className="block text-sm font-semibold text-foreground mb-1">
               {mode === 'login' ? 'Username or Email' : 'Username'}
             </label>
-            <input
-              type="text"
-              value={formData.username}
-              onChange={e => setFormData({ ...formData, username: e.target.value })}
-              placeholder={mode === 'login' ? 'alexdesigner' : 'Choose a username'}
-              className="w-full bg-background/50 border border-border/30 rounded-lg px-4 py-2.5 text-foreground placeholder:text-foreground/40 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={formData.username}
+                onChange={mode === 'signup' ? handleUsernameChange : (e => setFormData({ ...formData, username: e.target.value }))}
+                placeholder={mode === 'login' ? 'alexdesigner' : 'e.g. johndoe'}
+                className={`w-full bg-background/50 border rounded-lg px-4 py-2.5 text-foreground placeholder:text-foreground/40 focus:outline-none focus:ring-1 smooth-transition ${
+                  mode === 'signup' && usernameHint.type === 'error'
+                    ? 'border-destructive/60 focus:border-destructive/80 focus:ring-destructive/30'
+                    : mode === 'signup' && usernameHint.type === 'taken'
+                    ? 'border-destructive/60 focus:border-destructive/80 focus:ring-destructive/30'
+                    : mode === 'signup' && usernameHint.type === 'available'
+                    ? 'border-green-500/60 focus:border-green-500/80 focus:ring-green-500/30'
+                    : 'border-border/30 focus:border-accent/50 focus:ring-accent/20'
+                }`}
+              />
+              {/* Status icon */}
+              {mode === 'signup' && formData.username && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {usernameHint.type === 'checking' && <Loader2 className="w-4 h-4 text-foreground/40 animate-spin" />}
+                  {usernameHint.type === 'available' && <Check className="w-4 h-4 text-green-500" />}
+                  {(usernameHint.type === 'taken' || usernameHint.type === 'error') && <AlertCircle className="w-4 h-4 text-destructive" />}
+                </span>
+              )}
+            </div>
+            {/* Inline hint message */}
+            {mode === 'signup' && usernameHint.message && (
+              <p className={`text-xs mt-1 ${
+                usernameHint.type === 'available' ? 'text-green-500' :
+                usernameHint.type === 'checking' ? 'text-foreground/40' :
+                'text-destructive'
+              }`}>
+                {usernameHint.message}
+              </p>
+            )}
+            {mode === 'signup' && !formData.username && (
+              <p className="text-xs mt-1 text-foreground/40">Only lowercase letters, numbers & underscores (3-20 chars)</p>
+            )}
           </div>
 
           {mode === 'signup' && (
@@ -175,7 +298,51 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
               placeholder="••••••••"
               className="w-full bg-background/50 border border-border/30 rounded-lg px-4 py-2.5 text-foreground placeholder:text-foreground/40 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
             />
+            {mode === 'signup' && formData.password && formData.password.length < 8 && (
+              <p className="text-xs mt-1 text-destructive">Must be at least 8 characters</p>
+            )}
           </div>
+
+          {mode === 'signup' && (
+            <div>
+              <label className="block text-sm font-semibold text-foreground mb-1">Confirm Password</label>
+              <input
+                type="password"
+                value={formData.confirmPassword}
+                onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
+                placeholder="••••••••"
+                className={`w-full bg-background/50 border rounded-lg px-4 py-2.5 text-foreground placeholder:text-foreground/40 focus:outline-none focus:ring-1 smooth-transition ${
+                  formData.confirmPassword && formData.confirmPassword !== formData.password
+                    ? 'border-destructive/60 focus:border-destructive/80 focus:ring-destructive/30'
+                    : formData.confirmPassword && formData.confirmPassword === formData.password
+                    ? 'border-green-500/60 focus:border-green-500/80 focus:ring-green-500/30'
+                    : 'border-border/30 focus:border-accent/50 focus:ring-accent/20'
+                }`}
+              />
+              {formData.confirmPassword && formData.confirmPassword !== formData.password && (
+                <p className="text-xs mt-1 text-destructive flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" /> Passwords do not match
+                </p>
+              )}
+              {formData.confirmPassword && formData.confirmPassword === formData.password && (
+                <p className="text-xs mt-1 text-green-500 flex items-center gap-1">
+                  <Check className="w-3 h-3" /> Passwords match
+                </p>
+              )}
+            </div>
+          )}
+
+          {mode === 'login' && (
+            <div className="text-right -mt-2">
+              <button
+                type="button"
+                onClick={() => { onClose(); router.push('/forgot-password'); }}
+                className="text-xs text-accent hover:text-accent/80 font-medium smooth-transition"
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
 
           <button type="submit" className="luxury-button w-full py-3" disabled={loading}>
             {loading ? 'Please wait...' : mode === 'login' ? 'Sign In' : 'Create Account'}

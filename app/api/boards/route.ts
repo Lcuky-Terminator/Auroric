@@ -7,8 +7,9 @@ export async function GET() {
   try {
     const boards = await getAllBoards();
     return NextResponse.json(boards);
-  } catch {
-    return NextResponse.json([], { status: 500 });
+  } catch (err) {
+    console.error('[API] GET /api/boards error:', err);
+    return NextResponse.json([]);
   }
 }
 

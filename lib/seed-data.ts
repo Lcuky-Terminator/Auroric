@@ -40,6 +40,7 @@ export function generateSeedData() {
       followers: ['user-2', 'user-3', 'user-4', 'user-5'],
       following: ['user-2', 'user-3'],
       createdAt: '2025-06-15T10:00:00Z',
+      emailVerified: true,
       settings: {
         privateProfile: false,
         showActivity: true,
@@ -61,6 +62,7 @@ export function generateSeedData() {
       followers: ['user-current', 'user-3', 'user-4'],
       following: ['user-current', 'user-3', 'user-5'],
       createdAt: '2025-07-20T14:30:00Z',
+      emailVerified: true,
       settings: { privateProfile: false, showActivity: true, allowMessages: true, allowNotifications: true, emailOnNewFollower: true, emailOnPinInteraction: true, theme: 'dark' },
     },
     {
@@ -74,6 +76,7 @@ export function generateSeedData() {
       followers: ['user-current', 'user-2', 'user-5'],
       following: ['user-current', 'user-2', 'user-4'],
       createdAt: '2025-08-10T09:15:00Z',
+      emailVerified: true,
       settings: { privateProfile: false, showActivity: true, allowMessages: true, allowNotifications: true, emailOnNewFollower: true, emailOnPinInteraction: true, theme: 'dark' },
     },
     {
@@ -87,6 +90,7 @@ export function generateSeedData() {
       followers: ['user-3'],
       following: ['user-current', 'user-2'],
       createdAt: '2025-09-05T16:45:00Z',
+      emailVerified: true,
       settings: { privateProfile: false, showActivity: true, allowMessages: true, allowNotifications: true, emailOnNewFollower: true, emailOnPinInteraction: true, theme: 'dark' },
     },
     {
@@ -100,6 +104,7 @@ export function generateSeedData() {
       followers: ['user-2'],
       following: ['user-current', 'user-3'],
       createdAt: '2025-10-01T11:20:00Z',
+      emailVerified: true,
       settings: { privateProfile: false, showActivity: true, allowMessages: true, allowNotifications: true, emailOnNewFollower: true, emailOnPinInteraction: true, theme: 'dark' },
     },
   ];
@@ -244,6 +249,7 @@ export function generateSeedData() {
     likes: generateRandomLikes(i),
     saves: generateRandomSaves(i),
     comments: generateComments(`pin-${i + 1}`, i),
+    views: Math.floor(Math.random() * 5000) + 100,
     isPrivate: false,
     createdAt: generateDate(i),
     updatedAt: generateDate(i),

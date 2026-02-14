@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { getSession } from 'next-auth/react';
 import { User, Pin, Board, Notification } from './types';
 import { api } from './api-client';
+import { registerUser } from './email-verification';
 
 interface AppContextType {
   // Auth
@@ -78,18 +79,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Load all data from API
   const loadData = useCallback(async () => {
-    try {
-      const [pinsData, boardsData, usersData] = await Promise.all([
-        api.getPins(),
-        api.getBoards(),
-        api.getUsers(),
-      ]);
-      setPins(pinsData);
-      setBoards(boardsData);
-      setUsers(usersData);
-    } catch (err) {
-      console.error('Failed to load data:', err);
-    }
+    const results = await Promise.allSettled([
+      api.getPins(),
+      api.getBoards(),
+      api.getUsers(),
+    ]);
+    if (results[0].status === 'fulfilled') setPins(results[0].value);
+    if (results[1].status === 'fulfilled') setBoards(results[1].value);
+    if (results[2].status === 'fulfilled') setUsers(results[2].value);
   }, []);
 
   const loadNotifications = useCallback(async () => {
@@ -111,22 +108,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
             if (key.startsWith('auroric_')) localStorage.removeItem(key);
           });
         }
-        // Check existing JWT auth first
-        const { user } = await api.me();
-        if (user) {
-          setCurrentUser(user);
-        } else {
-          // No JWT cookie — check if there's a NextAuth Google session to bridge
-          try {
-            const session = await getSession();
-            if (session?.provider === 'google') {
-              const { user: googleUser } = await api.googleBridge();
-              if (googleUser) {
-                setCurrentUser(googleUser);
+
+        // Detect if we just came back from a Google OAuth redirect
+        const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const isGoogleRedirect = params?.get('google') === '1';
+
+        // If this is a Google redirect, prioritize bridging the Google session
+        if (isGoogleRedirect) {
+          // Clean up the URL param
+          if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('google');
+            window.history.replaceState({}, '', url.pathname + url.search);
+          }
+          // Retry bridging a few times (session cookie may take a moment)
+          for (let attempt = 0; attempt < 5; attempt++) {
+            try {
+              const session = await getSession();
+              if (session?.provider === 'google') {
+                const { user: googleUser } = await api.googleBridge();
+                if (googleUser) {
+                  setCurrentUser(googleUser);
+                  break;
+                }
               }
-            }
-          } catch {
-            // No Google session either, that's fine
+            } catch { /* retry */ }
+            await new Promise(r => setTimeout(r, 600));
+          }
+        } else {
+          // Normal init: check existing JWT auth first
+          const meResult = await api.me().catch(() => ({ user: null }));
+          if (meResult.user) {
+            setCurrentUser(meResult.user);
+          } else {
+            // No JWT cookie — check if there's a NextAuth Google session to bridge
+            const tryGoogleBridge = async (retries = 3, delay = 800): Promise<boolean> => {
+              for (let i = 0; i < retries; i++) {
+                try {
+                  const session = await getSession();
+                  if (session?.provider === 'google') {
+                    const { user: googleUser } = await api.googleBridge();
+                    if (googleUser) {
+                      setCurrentUser(googleUser);
+                      return true;
+                    }
+                  }
+                  if (session && !session.provider) return false;
+                } catch { /* retry */ }
+                if (i < retries - 1) {
+                  await new Promise(r => setTimeout(r, delay));
+                }
+              }
+              return false;
+            };
+            await tryGoogleBridge();
           }
         }
       } catch {
@@ -173,9 +208,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const signup = useCallback(async (username: string, displayName: string, email: string, password: string): Promise<boolean> => {
     try {
-      const { user } = await api.signup(username, displayName, email, password);
+      const { user, verificationSent } = await registerUser(email, password, displayName, username);
       setCurrentUser(user);
       await loadData();
+      // If verification email was sent, the RequireAuth component will
+      // redirect unverified users to /verify-email automatically.
       return true;
     } catch {
       return false;

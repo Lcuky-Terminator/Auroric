@@ -5,7 +5,8 @@ export async function GET() {
   try {
     const users = await getAllUsers();
     return NextResponse.json(users);
-  } catch {
-    return NextResponse.json([], { status: 500 });
+  } catch (err) {
+    console.error('[API] GET /api/users error:', err);
+    return NextResponse.json([]);
   }
 }

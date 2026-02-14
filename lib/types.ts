@@ -10,6 +10,8 @@ export interface User {
   following: string[];
   createdAt: string;
   settings: UserSettings;
+  /** Whether the user's email address has been verified */
+  emailVerified: boolean;
 }
 
 export interface UserSettings {
@@ -35,6 +37,7 @@ export interface Pin {
   likes: string[];
   saves: string[];
   comments: Comment[];
+  views: number;
   isPrivate: boolean;
   createdAt: string;
   updatedAt: string;

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getPin, deletePin as dbDeletePin } from '@/lib/db';
+import { getPin, deletePin as dbDeletePin, incrementPinViews } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -7,6 +7,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const { id } = await params;
     const pin = await getPin(id);
     if (!pin) return NextResponse.json({ error: 'Pin not found' }, { status: 404 });
+
+    // Increment view count (fire and forget — don't block the response)
+    incrementPinViews(id).catch(() => {});
+
     return NextResponse.json(pin);
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -25,6 +25,7 @@ function docToUser(doc: any): ServerUser {
     followers: jsonParse(doc.followersJson),
     following: jsonParse(doc.followingJson),
     createdAt: doc.createdAt,
+    emailVerified: doc.emailVerified ?? false,
     settings: {
       privateProfile: doc.settingsPrivateProfile ?? false,
       showActivity: doc.settingsShowActivity ?? true,
@@ -49,6 +50,7 @@ function userToDoc(u: ServerUser): Record<string, any> {
     followersJson: JSON.stringify(u.followers),
     followingJson: JSON.stringify(u.following),
     createdAt: u.createdAt,
+    emailVerified: u.emailVerified ?? false,
     settingsPrivateProfile: u.settings.privateProfile,
     settingsShowActivity: u.settings.showActivity,
     settingsAllowMessages: u.settings.allowMessages,
@@ -73,6 +75,7 @@ function docToPin(doc: any): Pin {
     likes: jsonParse(doc.likesJson),
     saves: jsonParse(doc.savesJson),
     comments: jsonParse(doc.commentsJson),
+    views: doc.views ?? 0,
     isPrivate: doc.isPrivate ?? false,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt || doc.createdAt,
@@ -91,6 +94,7 @@ function pinToDoc(p: Pin): Record<string, any> {
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
     isPrivate: p.isPrivate,
+    views: p.views ?? 0,
     tagsJson: JSON.stringify(p.tags),
     likesJson: JSON.stringify(p.likes),
     savesJson: JSON.stringify(p.saves),
@@ -557,6 +561,41 @@ export async function getTrendingPins(): Promise<Pin[]> {
         b.likes.length + b.saves.length + b.comments.length -
         (a.likes.length + a.saves.length + a.comments.length)
     );
+}
+
+/**
+ * Get popular pins sorted by a specific metric.
+ * @param sortBy - 'views' | 'likes' | 'comments'
+ */
+export async function getPopularPins(sortBy: 'views' | 'likes' | 'comments' = 'views'): Promise<Pin[]> {
+  const docs = await listAll(PINS_COL);
+  const publicPins = docs.map(docToPin).filter(p => !p.isPrivate);
+
+  switch (sortBy) {
+    case 'views':
+      return publicPins.sort((a, b) => (b.views ?? 0) - (a.views ?? 0));
+    case 'likes':
+      return publicPins.sort((a, b) => b.likes.length - a.likes.length);
+    case 'comments':
+      return publicPins.sort((a, b) => b.comments.length - a.comments.length);
+    default:
+      return publicPins;
+  }
+}
+
+/**
+ * Increment the view counter for a pin.
+ */
+export async function incrementPinViews(pinId: string): Promise<number> {
+  try {
+    const doc = await databases.getDocument(DB_ID, PINS_COL, pinId);
+    const currentViews = doc.views ?? 0;
+    const newViews = currentViews + 1;
+    await databases.updateDocument(DB_ID, PINS_COL, pinId, { views: newViews });
+    return newViews;
+  } catch {
+    return 0;
+  }
 }
 
 // ==================== BOARDS ====================

@@ -21,8 +21,9 @@ export async function GET(request: Request) {
     // Filter out private pins for public API
     const publicPins = pins.filter((p: Pin) => !p.isPrivate);
     return NextResponse.json(publicPins);
-  } catch {
-    return NextResponse.json([], { status: 500 });
+  } catch (err) {
+    console.error('[API] GET /api/pins error:', err);
+    return NextResponse.json([]);
   }
 }
 
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
       likes: [],
       saves: [],
       comments: [],
+      views: 0,
       isPrivate: body.isPrivate || false,
       createdAt: now,
       updatedAt: now,

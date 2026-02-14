@@ -138,6 +138,7 @@ async function main() {
   await bool('users', 'settingsEmailOnNewFollower', false, false);
   await bool('users', 'settingsEmailOnPinInteraction', false, false);
   await str('users', 'settingsTheme', 10, false, 'dark');
+  await bool('users', 'emailVerified', false, false);
   console.log('  DONE Users\n');
 
   console.log('Pins attributes...');

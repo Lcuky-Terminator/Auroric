@@ -7,7 +7,7 @@ import PinCard from '@/components/pin-card';
 import UserAvatar from '@/components/user-avatar';
 import FollowButton from '@/components/follow-button';
 import SaveToBoardModal from '@/components/save-to-board-modal';
-import { Heart, MessageCircle, Share2, Copy, Bookmark, Trash2, Send } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Copy, Bookmark, Trash2, Send, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/app-context';
@@ -204,6 +204,10 @@ export default function PinDetailPage({ params }: { params: Promise<{ id: string
                     <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-accent' : ''}`} />
                     <span className="text-sm font-medium">{formatCount(pin.saves.length)}</span>
                   </button>
+                  <div className="flex items-center gap-2 flex-1 justify-center py-2 text-foreground/50">
+                    <Eye className="w-5 h-5" />
+                    <span className="text-sm font-medium">{formatCount(pin.views ?? 0)}</span>
+                  </div>
                 </div>
 
                 {isLoggedIn && (

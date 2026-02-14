@@ -49,6 +49,7 @@ export async function POST() {
         followers: [],
         following: [],
         createdAt: new Date().toISOString(),
+        emailVerified: true, // Google-verified email is inherently trusted
         settings: {
           privateProfile: false,
           showActivity: true,

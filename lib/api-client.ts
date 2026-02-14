@@ -43,6 +43,24 @@ export const api = {
       method: 'POST',
     }),
 
+  /** Check if the current user's email is verified */
+  checkVerification: () =>
+    fetchJson<{ verified: boolean }>('/api/auth/verify'),
+
+  /** Send a password reset email */
+  forgotPassword: (email: string) =>
+    fetchJson<{ ok: boolean; message: string }>('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  /** Reset password with a recovery token */
+  resetPassword: (userId: string, secret: string, password: string) =>
+    fetchJson<{ ok: boolean; message: string }>('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ userId, secret, password }),
+    }),
+
   // ============ PINS ============
   getPins: () => fetchJson<Pin[]>('/api/pins'),
 
@@ -58,6 +76,12 @@ export const api = {
     const params = new URLSearchParams({ limit: String(limit) });
     if (category && category !== 'All') params.set('category', category);
     return fetchJson<Pin[]>(`/api/pins/trending?${params}`);
+  },
+
+  getPopularPins: (sortBy: 'views' | 'likes' | 'comments' = 'views', limit = 20, category?: string) => {
+    const params = new URLSearchParams({ sortBy, limit: String(limit) });
+    if (category && category !== 'All') params.set('category', category);
+    return fetchJson<Pin[]>(`/api/pins/popular?${params}`);
   },
 
   createPin: (data: Omit<Pin, 'id' | 'createdAt' | 'updatedAt' | 'likes' | 'saves' | 'comments'>) =>

@@ -54,6 +54,7 @@ export default function Header() {
               <Link href="/" className="text-foreground/70 hover:text-accent smooth-transition text-sm font-medium">Home</Link>
               <Link href="/explore" className="text-foreground/70 hover:text-accent smooth-transition text-sm font-medium">Explore</Link>
               <Link href="/trending" className="text-foreground/70 hover:text-accent smooth-transition text-sm font-medium">Trending</Link>
+              <Link href="/popular" className="text-foreground/70 hover:text-accent smooth-transition text-sm font-medium">Popular</Link>
               {isLoggedIn && (
                 <Link href="/boards" className="text-foreground/70 hover:text-accent smooth-transition text-sm font-medium">Boards</Link>
               )}
@@ -149,6 +150,7 @@ export default function Header() {
                 <Link href="/" onClick={() => setIsMenuOpen(false)} className="text-foreground/70 hover:text-accent py-2">Home</Link>
                 <Link href="/explore" onClick={() => setIsMenuOpen(false)} className="text-foreground/70 hover:text-accent py-2">Explore</Link>
                 <Link href="/trending" onClick={() => setIsMenuOpen(false)} className="text-foreground/70 hover:text-accent py-2">Trending</Link>
+                <Link href="/popular" onClick={() => setIsMenuOpen(false)} className="text-foreground/70 hover:text-accent py-2">Popular</Link>
                 {isLoggedIn ? (
                   <>
                     <Link href="/boards" onClick={() => setIsMenuOpen(false)} className="text-foreground/70 hover:text-accent py-2">Boards</Link>
